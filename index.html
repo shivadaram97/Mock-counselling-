@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CGS 2026 Radiodiagnosis · Mock Counselling</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mu:#6b7280;--cd:#f3f4f6;--ac:#2563eb;--ok:#15803d;--bd:#d1d5db;--wn:#b45309;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111418;--fg:#e5e7eb;--mu:#9ca3af;--cd:#1c2128;--ac:#60a5fa;--ok:#4ade80;--bd:#30363d;--wn:#fbbf24;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111418;--fg:#e5e7eb;--mu:#9ca3af;--cd:#1c2128;--ac:#60a5fa;--ok:#4ade80;--bd:#30363d;--wn:#fbbf24;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.w{max-width:640px;margin:0 auto;padding:14px}
+h1{font-size:18px;margin:0 0 2px}h2{font-size:15px;margin:14px 0 6px}.mu{color:var(--mu);font-size:13px}
+.c{background:var(--cd);border:1px solid var(--bd);border-radius:10px;padding:12px;margin:10px 0}
+input{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg);font-size:16px;margin:4px 0}
+button{padding:9px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--fg);font-size:14px}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}button:disabled{opacity:.45}
+.r{display:flex;align-items:center;gap:6px;padding:7px 0;border-top:1px solid var(--bd)}.r:first-child{border-top:0}
+.r span.t{flex:1}.n{width:24px;color:var(--mu);text-align:right}
+.tabs{display:flex;gap:6px;margin:10px 0}.tabs button{flex:1}.tabs .on{border-color:var(--ac);color:var(--ac);font-weight:600}
+.ok{color:var(--ok);font-weight:600}.wn{color:var(--wn)}.me{color:var(--ac);font-weight:600}
+.sc{max-height:300px;overflow-y:auto}.hide{display:none}
+</style><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head><body><div class="w">
+<h1>CGS 2026 · MD Radiodiagnosis</h1>
+<div class="mu">Mock counselling · merit-based live allotment · 90 candidates, 91 seats</div>
+<div id="msg" class="c wn hide"></div>
+
+<div id="login" class="c">
+<b>Login</b>
+<input id="reg" inputmode="numeric" placeholder="Registration no. (e.g. 23105001014)">
+<input id="pin" type="password" inputmode="numeric" placeholder="PIN (first time: choose 4+ digits)">
+<button class="p" id="go">Login / Register</button>
+<div class="mu" style="margin-top:6px">First login sets your PIN. Mock exercise only, not the official process.</div>
+</div>
+
+<div id="app" class="hide">
+<div class="c"><b id="who"></b><div class="mu" id="rk"></div><div id="stat" style="margin-top:6px"></div>
+<div id="st" class="mu"></div></div>
+<div class="tabs"><button id="t1" class="on">My options</button><button id="t2">Allotment board</button></div>
+<div id="v1">
+<div class="c"><b>Your order of preference</b><div id="mine"></div>
+<div style="margin-top:8px"><button class="p" id="save">Save options</button> <span class="mu" id="sv"></span></div></div>
+<div class="c"><b>Add colleges</b><input id="q" placeholder="Search college"><div class="sc" id="pick"></div></div>
+</div>
+<div id="v2" class="hide"><div id="board"></div></div>
+<button id="out" style="margin-top:8px">Logout</button>
+</div>
+
+<div class="mu" style="text-align:center;margin-top:14px"><a href="#" id="al">Admin</a></div>
+<div id="adm" class="c hide"><b>Admin</b>
+<div class="mu" id="ast"></div>
+<button id="tg" class="p">Close / open option window</button>
+<input id="rr" inputmode="numeric" placeholder="Reset PIN: registration no.">
+<button id="rb">Reset this candidate</button>
+</div>
+</div>
+<script>
+// Paste your Firebase web-app config here (see README)
+const FIREBASE_CONFIG={apiKey:"AIzaSyAmx20ISdOAQ7HC8xe5nAtZdAb4DVn4VSs",authDomain:"mock-counseling.firebaseapp.com",projectId:"mock-counseling",appId:"1:609650507532:web:59e940f493b30284e19329"};
+const C=`001014,PIRANGI PRAGNYA,594
+003003,DR GANESH KUMAR K,591
+020001,ANANTHU VENKATA RAMYA,587
+003001,ARIGELA SPOORTHI SWARALI,586
+011002,ANJALI YERRABELLY,579
+003002,BANDARI NIKHIL YADAV,579
+001011,KOVVURI SAI TEJASWI REDDY,578
+003004,MUNAZZA SALAHUDDIN,566
+010002,BANDARI NAVEEN KUMAR,566
+002008,SUSHMITHA N,565
+006002,G.LAKSHMI HARSHITHA,565
+005006,V SHIRLEY VINOLIA,563
+011004,BANDI NAVEEN GOUD,560
+002003,DIVYA JAIN POKARNA,560
+020003,KUPPAM RITHYA,559
+021002,BUTHPUR TEJASWINI,556
+001010,KONDURU PUSHPATEJASRI,555
+001016,ZEESHAN AHMED JALEELI,554
+002004,MANDEM SHREYA,554
+001007,DARAM SHIVA KUMAR,553
+013008,UZMA NAUSHEEN,553
+013003,BHUKYA SAMPATH,552
+013005,JANGALA KALYAN CHAKRAVARTHY,551
+016007,JILLELLA VARSHA,551
+008003,BHARUPATI KAVYA,551
+016008,KARTHIK VISHNU WARDHAN G,550
+016009,MUPPIDI SUSMITHA,549
+005002,AKSHITHA KANYADHARA,547
+016005,BARRE ARUNIMA,546
+001006,CHIGURUMAMIDI RAJ KUMAR,543
+001012,LAKSHMIRATAN REDDY P,543
+016001,ADVAITA SHANKAR,543
+001003,BYROJU SHIVA SAI TEJA,542
+016013,SANDHYA DARRU,542
+006004,MALOTHU MOUNIKA DEVI,540
+021004,GUDURI ROHITH REDDY,539
+019002,PABBATHIREDDY KEERTHANA,539
+008001,BANALA SAGARIKA,539
+007004,KASTURI AKHILA,539
+013002,BATHULA VENKATA DURGA ASHOK,535
+008004,KOTA MANASA,534
+001015,SHILPA RATHOD,533
+002001,AYESHA AFREEN,532
+002006,MOHAMMED HAROON AHMED,532
+001008,HARISHANKAR P,531
+011001,ADABALA NAGA VENKATA PRASUNA,527
+001004,CHAVANTAKURE SAI VANI,522
+002002,DEVATHA SHREEYA STHITHA PRAGNA,521
+001009,KALLAMADI REVATHI,519
+001005,CHERUKUPALLI PRATHYUSHA KANNA,517
+009003,Divi Asriyasha Jagadeeswari,516
+010007,PULLURI PUJITHA,516
+007001,DEVARASHETTY SRAVYA,516
+002009,VIGNESH R,515
+001001,ALLADA SOWJANYA,513
+008007,REGUNTA UHA SRI,512
+011007,DIVYA JYOTHI VENKANNAGARI,510
+002007,RAYILA KALYAN KUMAR,508
+018008,YARRAM PAVANI REDDY,506
+023003,JAYSHRUTI SINGH SISODIA,505
+008009,VENKATA DADAN E,503
+004004,MOHD HASAN ALI,501
+009007,K Sameera,501
+013009,V SWETHA,500
+010006,PULIPETA NIKHITHA,498
+001013,NELOFAR P,497
+011005,CHEDIPOTHULA INDRAJA,496
+021005,VIVEKANAND B,496
+023004,KAMRE KRISHNAKANTH,496
+009006,Humairaa Naaz,495
+023005,MD SOHAIL AHMED,491
+002005,MITPELLYWAR SRIKANTH,491
+030002,MOODA SUMANTH,486
+009005,Gorakula Nityasri,484
+012003,AYESHA MALIHA NIDA,481
+009012,Vonteru Samuyuktha,479
+004007,SYEDAH HAFSA FIRDOUS,477
+023002,DINESH KARKALA,476
+025003,VELMA RAMYASREE,471
+032002,PERUMALA SUSHMA SREE,471
+007005,RAJKUMAR BHUKYA,471
+004001,A S SHAMINTAZ,462
+010008,SUBHASH KUMAR R,461
+016011,PAMBALA SHANTHANA KUMARI,458
+018004,KALVA VENKATESH,457
+018007,TEJAVATH SAI PRIYA,450
+023001,CHANDANA D,444
+018002,DUNNA ANUPAMA,429
+009009,Ramavath Ramesh,412
+001002,BONKURI SWAPNA,410`.split("\n").map((l,i)=>{const a=l.split(",");return{i,reg:"23105"+a[0],name:a[1],m:+a[2]}});
+const K=`TIMS / GMC Suryapet|3
+Osmania Medical College, Hyderabad|6
+Gandhi Medical College, Secunderabad|4
+Kakatiya Medical College, Hanumakonda|5
+RIMS, Adilabad|3
+GMC Mahabubnagar|2
+GMC Siddipet|3
+GMC Nizamabad|3
+GMC Suryapet|2
+GMC Nalgonda|2
+GMC Sangareddy|2
+GMC Mahabubabad|2
+GMC Mancherial|3
+GMC Wanaparthy|2
+GMC Bhadradri Kothagudem|2
+GMC Jagitial|2
+GMC Nagarkurnool|2
+GMC Ramagundam|3
+GMC Rajanna Siricilla|2
+GMC Kamareddy|2
+GMC Vikarabad|2
+GMC Khammam|2
+GMC Karimnagar|2
+GMC Jayashankar Bhupalapally|2
+GMC Komaram Bheem Asifabad|2
+GMC Jangaon|2
+GMC Nirmal|2
+GMC Yadadri|2
+GMC Quthbullapur|2
+GMC Medak|2
+GMC Narsampet|2
+GMC Maheshwaram|2
+GMC Gadwal|3
+GMC Narayanpet|3
+GMC Mulugu|3
+GMC Kodangal|3`.split("\n").map(l=>{const a=l.split("|");return{n:a[0],s:+a[1]}});
+const $=id=>document.getElementById(id);
+let db=null,user=null,docs={},open=true,me=null,mine=[],dirty=false,admin=false,tab=1;
+const ss=(k,v)=>{try{v===undefined?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+const gs=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+function note(t){const m=$("msg");m.textContent=t;m.classList.toggle("hide",!t)}
+async function hash(s){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")}catch(e){let h=5381;for(const ch of s)h=((h<<5)+h+ch.charCodeAt(0))|0;return "x"+h}}
+function findC(r){r=String(r).replace(/\D/g,"");if(r.length<6)return null;return C.find(c=>c.reg.endsWith(r.slice(-6)))}
+function allot(){const left=K.map(k=>k.s),res={},by=K.map(()=>[]);
+for(const c of C){const d=docs[c.reg];if(!d||!Array.isArray(d.p))continue;
+for(const k of d.p){if(Number.isInteger(k)&&K[k]&&left[k]>0){left[k]--;res[c.reg]=k;by[k].push(c);break}}}
+return{res,by,left}}
+async function login(){note("");const c=findC($("reg").value),pin=$("pin").value;
+if(!c)return note("Registration number not found in the merit list.");
+if(pin.length<4)return note("PIN must be at least 4 digits.");
+if(!db)return note("Database not configured yet.");
+const h=await hash(c.reg+":"+pin);
+try{const s=await db.collection("cand").doc(c.reg).get();
+if(s.exists){if(s.data().h!==h)return note("Wrong PIN. Ask the admin to reset it.")}
+else await db.collection("cand").doc(c.reg).set({h,p:[],t:Date.now()});
+}catch(e){return note("Could not reach the database: "+(e.message||e.code))}
+me=c;ss("cgs",c.reg+"|"+h);enter()}
+function enter(){const d=docs[me.reg];mine=d&&Array.isArray(d.p)?d.p.slice():[];dirty=false;
+$("login").classList.add("hide");$("app").classList.remove("hide");render()}
+function render(){
+$("adm").classList.toggle("hide",!admin);$("ast").textContent="Option window is "+(open?"OPEN":"CLOSED");
+if(!me)return;
+const d=docs[me.reg];if(!dirty&&d&&Array.isArray(d.p))mine=d.p.slice();
+const A=allot();
+$("who").textContent=me.name;$("rk").textContent="Merit rank "+(me.i+1)+" · Marks "+me.m;
+const k=A.res[me.reg];
+$("stat").innerHTML=!mine.length?'<span class="wn">Add your options below</span>':k!==undefined?'Projected allotment: <span class="ok">'+K[k].n+'</span>':'<span class="wn">Not allotted with current options. Add more colleges.</span>';
+$("st").textContent=open?"Options open. Allotment updates live as everyone saves.":"Options closed. Result below is final.";
+$("save").disabled=!open||!dirty;
+$("mine").innerHTML=mine.length?mine.map((x,j)=>'<div class="r"><span class="n">'+(j+1)+'</span><span class="t">'+K[x].n+' <span class="mu">('+K[x].s+')</span></span>'+(open?'<button data-u="'+j+'">↑</button><button data-d="'+j+'">↓</button><button data-x="'+j+'">✕</button>':"")+'</div>').join(""):'<div class="mu">No options yet.</div>';
+const q=$("q").value.toLowerCase();
+$("pick").innerHTML=open?K.map((c,j)=>mine.includes(j)||!c.n.toLowerCase().includes(q)?"":'<div class="r"><span class="t">'+c.n+' <span class="mu">('+c.s+')</span></span><button data-a="'+j+'">Add</button></div>').join(""):'<div class="mu">Window closed.</div>';
+$("board").innerHTML=K.map((c,j)=>{const b=A.by[j];return '<div class="c"><b>'+c.n+'</b> <span class="mu">· '+b.length+'/'+c.s+' filled'+(b.length?' · last rank '+(b[b.length-1].i+1):'')+'</span>'+b.map(x=>'<div class="r"><span class="n">'+(x.i+1)+'</span><span class="t'+(x.reg===me.reg?' me':'')+'">'+x.name+'</span></div>').join("")+'</div>'}).join("")}
+function mv(j,o){const t=j+o;if(t<0||t>=mine.length)return;[mine[j],mine[t]]=[mine[t],mine[j]];dirty=true;render()}
+document.addEventListener("click",async e=>{const b=e.target.closest("button");if(!b)return;const D=b.dataset;
+if(D.a!==undefined){mine.push(+D.a);dirty=true;render()}
+else if(D.x!==undefined){mine.splice(+D.x,1);dirty=true;render()}
+else if(D.u!==undefined)mv(+D.u,-1);else if(D.d!==undefined)mv(+D.d,1);
+});
+$("go").onclick=login;$("q").oninput=render;
+$("t1").onclick=()=>{tab=1;$("v1").classList.remove("hide");$("v2").classList.add("hide");$("t1").classList.add("on");$("t2").classList.remove("on")};
+$("t2").onclick=()=>{tab=2;$("v2").classList.remove("hide");$("v1").classList.add("hide");$("t2").classList.add("on");$("t1").classList.remove("on")};
+$("save").onclick=async()=>{try{await db.collection("cand").doc(me.reg).update({p:mine,t:Date.now()});dirty=false;$("sv").textContent="Saved";render()}catch(e){$("sv").textContent="Save failed: "+(e.message||e.code)}};
+$("out").onclick=()=>{ss("cgs");me=null;$("app").classList.add("hide");$("login").classList.remove("hide")};
+$("tg").onclick=async()=>{try{await db.doc("cfg/state").set({open:!open})}catch(e){note("Could not change window: "+(e.message||e.code))}};
+$("rb").onclick=async()=>{const c=findC($("rr").value);if(!c)return note("Registration number not found.");try{await db.collection("cand").doc(c.reg).delete();note("Reset done for "+c.name+". They can register a new PIN.")}catch(e){note("Reset failed: "+(e.message||e.code))}};
+$("al").onclick=async e=>{e.preventDefault();if(!db)return;const p=prompt("Admin password (first time: choose one now)");if(!p||p.length<4)return;const h=await hash("admin:"+p);const s=await db.doc("cfg/admin").get();if(!s.exists)await db.doc("cfg/admin").set({h});else if(s.data().h!==h)return note("Wrong admin password.");admin=true;render()};
+(async()=>{try{firebase.initializeApp(FIREBASE_CONFIG);db=firebase.firestore()}catch(e){}
+if(!db||FIREBASE_CONFIG.apiKey==="PASTE"){note("Database not configured yet. See README.");render();return}
+db.collection("cand").onSnapshot(s=>{docs={};s.docs.forEach(d=>docs[d.id]=d.data());
+if(!me){const sv=gs("cgs");if(sv){const a=sv.split("|"),c=findC(a[0]);if(c&&docs[c.reg]&&docs[c.reg].h===a[1]){me=c;enter();return}}}
+render()},e=>note("Database error: "+(e.message||e.code)));
+db.doc("cfg/state").onSnapshot(s=>{open=!s.exists||s.data().open!==false;render()},()=>{});
+render()})();
+</script></body></html>
