@@ -18,12 +18,21 @@ button.p{background:var(--ac);color:#fff;border-color:var(--ac)}button:disabled{
 .r span.t{flex:1}.n{width:24px;color:var(--mu);text-align:right}
 .tabs{display:flex;gap:6px;margin:10px 0}.tabs button{flex:1}.tabs .on{border-color:var(--ac);color:var(--ac);font-weight:600}
 .ok{color:var(--ok);font-weight:600}.wn{color:var(--wn)}.me{color:var(--ac);font-weight:600}
-.sc{max-height:300px;overflow-y:auto}.hide{display:none}
+.sc{max-height:300px;overflow-y:auto}.hide{display:none}.dis{border:2px solid var(--wn);border-radius:10px;padding:12px;margin:10px 0;background:var(--cd)}.dis b.h{display:block;font-size:17px;color:var(--wn);margin-bottom:6px}.dis ol{margin:6px 0 6px 18px;padding:0}.dis li{margin:4px 0}
 </style><script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head><body><div class="w">
 <h1>CGS 2026 · MD Radiodiagnosis</h1>
 <div class="mu">Mock counselling · merit-based live allotment · 90 candidates, 91 seats</div>
+<div class="dis"><b class="h">⚠ DISCLAIMER: provisional allotment only</b>
+The allotment shown here <b>may not match the final official allotment</b>, because:
+<ol>
+<li>Candidates may change their preferences at the last minute.</li>
+<li>There is a seat discrepancy: 91 seats in the matrix vs 90 candidates in the merit list.</li>
+<li>Service PGs and ESI PGs who are willing to do the ESI bond first are also included in the merit list.</li>
+<li>KNRUHS may use a different seat matrix during allotment than the one provided, because many seats would remain vacant with the current matrix (far peripheral seats may not be filled).</li>
+</ol>
+This is a mock exercise, only to give an overview.</div>
 <div id="msg" class="c wn hide"></div>
 
 <div id="login" class="c">
@@ -35,24 +44,21 @@ button.p{background:var(--ac);color:#fff;border-color:var(--ac)}button:disabled{
 </div>
 
 <div id="app" class="hide">
-<div class="c"><b id="who"></b><div class="mu" id="rk"></div><div id="stat" style="margin-top:6px"></div>
-<div id="st" class="mu"></div></div>
+<div class="c"><b id="who"></b><div class="mu" id="rk"></div><div id="stat" style="margin-top:6px"></div><div id="st" class="mu" style="margin-top:4px"></div></div>
 <div class="tabs"><button id="t1" class="on">My options</button><button id="t2">Allotment board</button></div>
-<div id="v1">
-<div class="c"><b>Your order of preference</b><div id="mine"></div>
-<div style="margin-top:8px"><button class="p" id="save">Save options</button> <span class="mu" id="sv"></span></div></div>
-<div class="c"><b>Add colleges</b><input id="q" placeholder="Search college"><div class="sc" id="pick"></div></div>
-</div>
-<div id="v2" class="hide"><div id="board"></div></div>
+<div id="v1"><div class="c"><b>Arrange your preferences</b><div class="mu">All colleges are listed in the official order. Rearrange, then tap Submit.</div><div id="mine"></div>
+<div style="margin-top:8px"><button class="p" id="save">Submit options</button> <button id="rs">Reset order</button> <span class="mu" id="sv"></span></div></div></div>
+<div id="v2" class="hide"><div id="bh" class="mu"></div><div id="board"></div></div>
 <button id="out" style="margin-top:8px">Logout</button>
 </div>
-
 <div class="mu" style="text-align:center;margin-top:14px"><a href="#" id="al">Admin</a></div>
 <div id="adm" class="c hide"><b>Admin</b>
-<div class="mu" id="ast"></div>
-<button id="tg" class="p">Close / open option window</button>
-<input id="rr" inputmode="numeric" placeholder="Reset PIN: registration no.">
-<button id="rb">Reset this candidate</button>
+<div class="mu" id="ast"></div><div id="mon" style="margin:6px 0"></div>
+<button id="tg" class="p">Close / open window</button> <button id="csv">Export result CSV</button> <button id="thb">Set reveal threshold</button>
+<details style="margin:8px 0"><summary>Live allotment (admin only)</summary><div class="sc" id="adl"></div></details>
+<details style="margin:8px 0"><summary>Candidate tracker</summary><div class="sc" id="trk"></div></details>
+<input id="rr" inputmode="numeric" placeholder="Reset PIN and submission: registration no.">
+<button id="rb">Reset this candidate</button> <button id="alo">Admin logout</button>
 </div>
 </div>
 <script>
@@ -185,16 +191,19 @@ GMC Narayanpet|3
 GMC Mulugu|3
 GMC Kodangal|3`.split("\n").map(l=>{const a=l.split("|");return{n:a[0],s:+a[1]}});
 const $=id=>document.getElementById(id);
-let db=null,user=null,docs={},open=true,me=null,mine=[],dirty=false,admin=false,tab=1;
+let db=null,docs={},manual=true,th=55,me=null,mine=[],dirty=false,admin=false;
 const ss=(k,v)=>{try{v===undefined?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
 const gs=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
-function note(t){const m=$("msg");m.textContent=t;m.classList.toggle("hide",!t)}
+const note=t=>{const m=$("msg");m.textContent=t;m.classList.toggle("hide",!t)};
+const isOpen=()=>manual;
+const reveal=()=>admin||!isOpen()||C.filter(c=>submitted(c.reg)).length>=th;
+const stamp=t=>t?new Date(t).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"";
 async function hash(s){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")}catch(e){let h=5381;for(const ch of s)h=((h<<5)+h+ch.charCodeAt(0))|0;return "x"+h}}
 function findC(r){r=String(r).replace(/\D/g,"");if(r.length<6)return null;return C.find(c=>c.reg.endsWith(r.slice(-6)))}
-function allot(){const left=K.map(k=>k.s),res={},by=K.map(()=>[]);
-for(const c of C){const d=docs[c.reg];if(!d||!Array.isArray(d.p))continue;
-for(const k of d.p){if(Number.isInteger(k)&&K[k]&&left[k]>0){left[k]--;res[c.reg]=k;by[k].push(c);break}}}
-return{res,by,left}}
+const submitted=reg=>{const d=docs[reg];return !!d&&Array.isArray(d.p)&&d.p.length===K.length&&new Set(d.p).size===K.length&&d.p.every(k=>Number.isInteger(k)&&K[k])};
+function allot(){const lf=K.map(k=>k.s),res={},by=K.map(()=>[]);
+for(const c of C){if(!submitted(c.reg))continue;for(const k of docs[c.reg].p){if(lf[k]>0){lf[k]--;res[c.reg]=k;by[k].push(c);break}}}
+return{res,by,lf}}
 async function login(){note("");const c=findC($("reg").value),pin=$("pin").value;
 if(!c)return note("Registration number not found in the merit list.");
 if(pin.length<4)return note("PIN must be at least 4 digits.");
@@ -202,44 +211,52 @@ if(!db)return note("Database not configured yet.");
 const h=await hash(c.reg+":"+pin);
 try{const s=await db.collection("cand").doc(c.reg).get();
 if(s.exists){if(s.data().h!==h)return note("Wrong PIN. Ask the admin to reset it.")}
-else await db.collection("cand").doc(c.reg).set({h,p:[],t:Date.now()});
+else await db.collection("cand").doc(c.reg).set({h,p:[],t:Date.now(),n:0});
 }catch(e){return note("Could not reach the database: "+(e.message||e.code))}
 me=c;ss("cgs",c.reg+"|"+h);enter()}
-function enter(){const d=docs[me.reg];mine=d&&Array.isArray(d.p)?d.p.slice():[];dirty=false;
+function enter(){mine=submitted(me.reg)?docs[me.reg].p.slice():K.map((_,i)=>i);dirty=false;
 $("login").classList.add("hide");$("app").classList.remove("hide");render()}
-function render(){
-$("adm").classList.toggle("hide",!admin);$("ast").textContent="Option window is "+(open?"OPEN":"CLOSED");
-if(!me)return;
-const d=docs[me.reg];if(!dirty&&d&&Array.isArray(d.p))mine=d.p.slice();
-const A=allot();
+function render(){const op=isOpen();$("adm").classList.toggle("hide",!admin);if(admin)adminView(op);if(!me)return;
+const d=docs[me.reg]||{},sub=submitted(me.reg);
+if(!dirty&&sub)mine=d.p.slice();if(mine.length!==K.length)mine=K.map((_,i)=>i);
+const A=allot(),k=A.res[me.reg],S=C.filter(c=>submitted(c.reg)).length;
 $("who").textContent=me.name;$("rk").textContent="Merit rank "+(me.i+1)+" · Marks "+me.m;
-const k=A.res[me.reg];
-$("stat").innerHTML=!mine.length?'<span class="wn">Add your options below</span>':k!==undefined?'Projected allotment: <span class="ok">'+K[k].n+'</span>':'<span class="wn">Not allotted with current options. Add more colleges.</span>';
-$("st").textContent=open?"Options open. Allotment updates live as everyone saves.":"Options closed. Result below is final.";
-$("save").disabled=!open||!dirty;
-$("mine").innerHTML=mine.length?mine.map((x,j)=>'<div class="r"><span class="n">'+(j+1)+'</span><span class="t">'+K[x].n+' <span class="mu">('+K[x].s+')</span></span>'+(open?'<button data-u="'+j+'">↑</button><button data-d="'+j+'">↓</button><button data-x="'+j+'">✕</button>':"")+'</div>').join(""):'<div class="mu">No options yet.</div>';
-const q=$("q").value.toLowerCase();
-$("pick").innerHTML=open?K.map((c,j)=>mine.includes(j)||!c.n.toLowerCase().includes(q)?"":'<div class="r"><span class="t">'+c.n+' <span class="mu">('+c.s+')</span></span><button data-a="'+j+'">Add</button></div>').join(""):'<div class="mu">Window closed.</div>';
-$("board").innerHTML=K.map((c,j)=>{const b=A.by[j];return '<div class="c"><b>'+c.n+'</b> <span class="mu">· '+b.length+'/'+c.s+' filled'+(b.length?' · last rank '+(b[b.length-1].i+1):'')+'</span>'+b.map(x=>'<div class="r"><span class="n">'+(x.i+1)+'</span><span class="t'+(x.reg===me.reg?' me':'')+'">'+x.name+'</span></div>').join("")+'</div>'}).join("")}
-function mv(j,o){const t=j+o;if(t<0||t>=mine.length)return;[mine[j],mine[t]]=[mine[t],mine[j]];dirty=true;render()}
-document.addEventListener("click",async e=>{const b=e.target.closest("button");if(!b)return;const D=b.dataset;
-if(D.a!==undefined){mine.push(+D.a);dirty=true;render()}
-else if(D.x!==undefined){mine.splice(+D.x,1);dirty=true;render()}
-else if(D.u!==undefined)mv(+D.u,-1);else if(D.d!==undefined)mv(+D.d,1);
-});
-$("go").onclick=login;$("q").oninput=render;
-$("t1").onclick=()=>{tab=1;$("v1").classList.remove("hide");$("v2").classList.add("hide");$("t1").classList.add("on");$("t2").classList.remove("on")};
-$("t2").onclick=()=>{tab=2;$("v2").classList.remove("hide");$("v1").classList.add("hide");$("t2").classList.add("on");$("t1").classList.remove("on")};
-$("save").onclick=async()=>{try{await db.collection("cand").doc(me.reg).update({p:mine,t:Date.now()});dirty=false;$("sv").textContent="Saved";render()}catch(e){$("sv").textContent="Save failed: "+(e.message||e.code)}};
+$("stat").innerHTML=!sub?'<span class="wn">⚠ Not submitted. You are not counted in the allotment until you tap Submit options.</span>':(dirty?'<span class="wn">Unsaved changes. Your last submitted list is still the one counted.</span><br>':'<span class="ok">✓ Submitted '+stamp(d.t)+'</span><br>')+(!reveal()?'Your provisional allotment will be visible once '+th+' of 90 have submitted ('+S+' so far).':k!==undefined?'Provisional allotment: <b class="ok">'+K[k].n+'</b>':'<span class="wn">No seat with this list</span>');
+$("st").textContent=op?"Window open. Result is provisional until the window closes.":"Window closed. Result is final.";
+$("save").disabled=!op||(sub&&!dirty);
+$("mine").innerHTML=mine.map((x,j)=>'<div class="r"><span class="n">'+(j+1)+'</span><span class="t">'+K[x].n+' <span class="mu">('+K[x].s+')</span></span>'+(op?'<button data-u="'+j+'">↑</button><button data-d="'+j+'">↓</button><button data-m="'+j+'">#</button>':"")+'</div>').join("");
+const f1=K.map(()=>0);C.forEach(c=>{if(submitted(c.reg))f1[docs[c.reg].p[0]]++});
+$("bh").textContent=S+" of 90 submitted · "+(90-S)+" pending. Only submitted candidates appear below.";
+$("board").innerHTML=!reveal()?'<div class="c wn">The allotment board appears once '+th+' of 90 have submitted.</div>':K.map((c,j)=>{const b=A.by[j];return '<div class="c"><b>'+c.n+'</b> <span class="mu">· '+b.length+'/'+c.s+' filled'+(b.length?' · last rank '+(b[b.length-1].i+1):'')+' · 1st choice of '+f1[j]+'</span>'+b.map(x=>'<div class="r"><span class="n">'+(x.i+1)+'</span><span class="t'+(x.reg===me.reg?' me':'')+'">'+x.name+'</span></div>').join("")+'</div>'}).join("")}
+function adminView(op){const A=allot(),S=C.filter(c=>submitted(c.reg)).length;
+$("adl").innerHTML=K.map((c,j)=>{const b=A.by[j];return '<div class="r"><span class="t"><b>'+c.n+'</b> '+b.length+'/'+c.s+'</span></div>'+b.map(x=>'<div class="r"><span class="n">'+(x.i+1)+'</span><span class="t">'+x.name+'</span></div>').join("")}).join("");
+$("ast").textContent="Window: "+(op?"OPEN":"CLOSED")+" · Reveal threshold: "+th;
+$("mon").textContent="Registered "+Object.keys(docs).length+"/90 · Submitted "+S+" · Pending "+(90-S);
+$("trk").innerHTML=C.map(c=>{const d=docs[c.reg],s=submitted(c.reg);return '<div class="r"><span class="n">'+(c.i+1)+'</span><span class="t">'+c.name+'</span><span class="'+(s?'ok':'mu')+'">'+(s?'✓ '+stamp(d.t)+' ×'+(d.n||1):d?'registered':'—')+'</span></div>'}).join("")}
+function mv(j,t){if(t<0||t>=mine.length||t===j)return;const x=mine.splice(j,1)[0];mine.splice(t,0,x);dirty=true;render()}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b||!isOpen())return;const D=b.dataset;
+if(D.u!==undefined)mv(+D.u,+D.u-1);else if(D.d!==undefined)mv(+D.d,+D.d+1);
+else if(D.m!==undefined){const p=parseInt(prompt("Move to position (1-"+K.length+")"),10);if(p>=1&&p<=K.length)mv(+D.m,p-1)}});
+$("go").onclick=login;
+$("t1").onclick=()=>{$("v1").classList.remove("hide");$("v2").classList.add("hide");$("t1").classList.add("on");$("t2").classList.remove("on")};
+$("t2").onclick=()=>{$("v2").classList.remove("hide");$("v1").classList.add("hide");$("t2").classList.add("on");$("t1").classList.remove("on")};
+$("rs").onclick=()=>{if(!isOpen())return;mine=K.map((_,i)=>i);dirty=true;render()};
+$("save").onclick=async()=>{if(!isOpen())return;if(!confirm("Submit this order of preference? You can change it until the window closes."))return;
+try{const d=docs[me.reg]||{};await db.collection("cand").doc(me.reg).update({p:mine,t:Date.now(),n:(d.n||0)+1});dirty=false;$("sv").textContent="Submitted"}catch(e){$("sv").textContent="Save failed: "+(e.message||e.code)}};
 $("out").onclick=()=>{ss("cgs");me=null;$("app").classList.add("hide");$("login").classList.remove("hide")};
-$("tg").onclick=async()=>{try{await db.doc("cfg/state").set({open:!open})}catch(e){note("Could not change window: "+(e.message||e.code))}};
-$("rb").onclick=async()=>{const c=findC($("rr").value);if(!c)return note("Registration number not found.");try{await db.collection("cand").doc(c.reg).delete();note("Reset done for "+c.name+". They can register a new PIN.")}catch(e){note("Reset failed: "+(e.message||e.code))}};
-$("al").onclick=async e=>{e.preventDefault();if(!db)return;const p=prompt("Admin password (first time: choose one now)");if(!p||p.length<4)return;const h=await hash("admin:"+p);const s=await db.doc("cfg/admin").get();if(!s.exists)await db.doc("cfg/admin").set({h});else if(s.data().h!==h)return note("Wrong admin password.");admin=true;render()};
+$("tg").onclick=async()=>{try{await db.doc("cfg/state").set({open:!manual},{merge:true})}catch(e){note("Could not change window: "+(e.message||e.code))}};
+$("rb").onclick=async()=>{const c=findC($("rr").value);if(!c)return note("Registration number not found.");try{await db.collection("cand").doc(c.reg).delete();note("Reset done for "+c.name+".")}catch(e){note("Reset failed: "+(e.message||e.code))}};
+$("csv").onclick=()=>{const A=allot();const rows=[["Rank","Reg no","Name","Marks","Allotted college"]].concat(C.map(c=>[c.i+1,c.reg,c.name,c.m,A.res[c.reg]!==undefined?K[A.res[c.reg]].n:"Not submitted"]));
+const t=rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="cgs-mock-result.csv";a.click()};
+$("thb").onclick=async()=>{const n=parseInt(prompt("Show allotment to candidates once this many have submitted (now "+th+")"),10);if(n>=0&&n<=90)try{await db.doc("cfg/state").set({th:n},{merge:true})}catch(e){note("Failed: "+(e.message||e.code))}};
+$("alo").onclick=()=>{admin=false;ss("cgsa");render()};
+$("al").onclick=async e=>{e.preventDefault();if(!db)return;const p=prompt("Admin password (if already set, enter it)");if(!p||p.length<4)return;const h=await hash("admin:"+p);const s=await db.doc("cfg/admin").get();if(!s.exists)await db.doc("cfg/admin").set({h});else if(s.data().h!==h)return note("Wrong admin password.");admin=true;ss("cgsa",h);render()};
 (async()=>{try{firebase.initializeApp(FIREBASE_CONFIG);db=firebase.firestore()}catch(e){}
 if(!db||FIREBASE_CONFIG.apiKey==="PASTE"){note("Database not configured yet. See README.");render();return}
 db.collection("cand").onSnapshot(s=>{docs={};s.docs.forEach(d=>docs[d.id]=d.data());
 if(!me){const sv=gs("cgs");if(sv){const a=sv.split("|"),c=findC(a[0]);if(c&&docs[c.reg]&&docs[c.reg].h===a[1]){me=c;enter();return}}}
 render()},e=>note("Database error: "+(e.message||e.code)));
-db.doc("cfg/state").onSnapshot(s=>{open=!s.exists||s.data().open!==false;render()},()=>{});
-render()})();
+db.doc("cfg/state").onSnapshot(s=>{manual=!s.exists||s.data().open!==false;th=s.exists&&Number.isInteger(s.data().th)?s.data().th:55;render()},()=>{});
+const sa=gs("cgsa");if(sa)db.doc("cfg/admin").get().then(s=>{if(s.exists&&s.data().h===sa){admin=true;render()}});
+setInterval(render,60000);render()})();
 </script></body></html>
