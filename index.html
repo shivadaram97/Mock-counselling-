@@ -54,7 +54,7 @@ This is a mock exercise, only to give an overview.</div>
 <div class="mu" style="text-align:center;margin-top:14px"><a href="#" id="al">Admin</a></div>
 <div id="adm" class="c hide"><b>Admin</b>
 <div class="mu" id="ast"></div><div id="mon" style="margin:6px 0"></div>
-<button id="tg" class="p">Close / open window</button> <button id="csv">Export result CSV</button> <button id="thb">Set reveal threshold</button>
+<button id="tg" class="p">Close / open window</button> <button id="csv">Export result CSV</button> <button id="csv2">Export option orders</button> <button id="thb">Set reveal threshold</button>
 <details style="margin:8px 0"><summary>Live allotment (admin only)</summary><div class="sc" id="adl"></div></details>
 <details style="margin:8px 0"><summary>Candidate tracker</summary><div class="sc" id="trk"></div></details>
 <input id="rr" inputmode="numeric" placeholder="Reset PIN and submission: registration no.">
@@ -191,7 +191,7 @@ GMC Narayanpet|3
 GMC Mulugu|3
 GMC Kodangal|3`.split("\n").map(l=>{const a=l.split("|");return{n:a[0],s:+a[1]}});
 const $=id=>document.getElementById(id);
-let db=null,docs={},manual=true,th=55,me=null,mine=[],dirty=false,admin=false;
+let db=null,docs={},manual=true,th=55,vw=null,me=null,mine=[],dirty=false,admin=false;
 const ss=(k,v)=>{try{v===undefined?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
 const gs=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const note=t=>{const m=$("msg");m.textContent=t;m.classList.toggle("hide",!t)};
@@ -232,9 +232,9 @@ function adminView(op){const A=allot(),S=C.filter(c=>submitted(c.reg)).length;
 $("adl").innerHTML=K.map((c,j)=>{const b=A.by[j];return '<div class="r"><span class="t"><b>'+c.n+'</b> '+b.length+'/'+c.s+'</span></div>'+b.map(x=>'<div class="r"><span class="n">'+(x.i+1)+'</span><span class="t">'+x.name+'</span></div>').join("")}).join("");
 $("ast").textContent="Window: "+(op?"OPEN":"CLOSED")+" · Reveal threshold: "+th;
 $("mon").textContent="Registered "+Object.keys(docs).length+"/90 · Submitted "+S+" · Pending "+(90-S);
-$("trk").innerHTML=C.map(c=>{const d=docs[c.reg],s=submitted(c.reg);return '<div class="r"><span class="n">'+(c.i+1)+'</span><span class="t">'+c.name+'</span><span class="'+(s?'ok':'mu')+'">'+(s?'✓ '+stamp(d.t)+' ×'+(d.n||1):d?'registered':'—')+'</span></div>'}).join("")}
+$("trk").innerHTML=C.map(c=>{const d=docs[c.reg],s=submitted(c.reg);return '<div class="r"><span class="n">'+(c.i+1)+'</span><span class="t">'+c.name+'</span><span class="'+(s?'ok':'mu')+'">'+(s?'✓ '+stamp(d.t)+' ×'+(d.n||1):d?'registered':'—')+'</span>'+(s?'<button data-v="'+c.reg+'">'+(vw===c.reg?'hide':'view')+'</button>':'')+'</div>'+(s&&vw===c.reg?'<div class="mu" style="padding:4px 0 8px 30px">'+d.p.map((k,j)=>(j+1)+'. '+K[k].n).join('<br>')+'</div>':'')}).join("")}
 function mv(j,t){if(t<0||t>=mine.length||t===j)return;const x=mine.splice(j,1)[0];mine.splice(t,0,x);dirty=true;render()}
-document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b||!isOpen())return;const D=b.dataset;
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const D=b.dataset;if(D.v!==undefined){vw=vw===D.v?null:D.v;render();return}if(!isOpen())return;
 if(D.u!==undefined)mv(+D.u,+D.u-1);else if(D.d!==undefined)mv(+D.d,+D.d+1);
 else if(D.m!==undefined){const p=parseInt(prompt("Move to position (1-"+K.length+")"),10);if(p>=1&&p<=K.length)mv(+D.m,p-1)}});
 $("go").onclick=login;
@@ -249,6 +249,8 @@ $("rb").onclick=async()=>{const c=findC($("rr").value);if(!c)return note("Regist
 $("csv").onclick=()=>{const A=allot();const rows=[["Rank","Reg no","Name","Marks","Allotted college"]].concat(C.map(c=>[c.i+1,c.reg,c.name,c.m,A.res[c.reg]!==undefined?K[A.res[c.reg]].n:"Not submitted"]));
 const t=rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="cgs-mock-result.csv";a.click()};
 $("thb").onclick=async()=>{const n=parseInt(prompt("Show allotment to candidates once this many have submitted (now "+th+")"),10);if(n>=0&&n<=90)try{await db.doc("cfg/state").set({th:n},{merge:true})}catch(e){note("Failed: "+(e.message||e.code))}};
+$("csv2").onclick=()=>{const h=["Rank","Reg no","Name","Submitted"].concat(K.map((_,i)=>"Pref "+(i+1)));const rows=[h].concat(C.map(c=>{const sb=submitted(c.reg);return [c.i+1,c.reg,c.name,sb?"Yes":"No"].concat(sb?docs[c.reg].p.map(k=>K[k].n):[])}));
+const t=rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"}));a.download="cgs-mock-option-orders.csv";a.click()};
 $("alo").onclick=()=>{admin=false;ss("cgsa");render()};
 $("al").onclick=async e=>{e.preventDefault();if(!db)return;const p=prompt("Admin password (if already set, enter it)");if(!p||p.length<4)return;const h=await hash("admin:"+p);const s=await db.doc("cfg/admin").get();if(!s.exists)await db.doc("cfg/admin").set({h});else if(s.data().h!==h)return note("Wrong admin password.");admin=true;ss("cgsa",h);render()};
 (async()=>{try{firebase.initializeApp(FIREBASE_CONFIG);db=firebase.firestore()}catch(e){}
